@@ -1,9 +1,0 @@
-{
-  "revision": 0,
-  "rules": [
-    {
-      "primary-output": "CMakeFiles\\roblox-cpp.dir\\src\\luau-code-gen\\type-gen\\LuauTypeGenerator.cpp.obj"
-    }
-  ],
-  "version": 1
-}

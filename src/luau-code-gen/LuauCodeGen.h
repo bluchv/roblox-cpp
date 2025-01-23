@@ -50,7 +50,7 @@ public:
   void writeVariable(const std::string &str, const std::string &varType) {
     write("local " + str);
 
-    auto generatedType = LuauTypeGenerator::generateType(str);
+    auto generatedType = LuauTypeGenerator::generateType(varType);
     if (!generatedType.empty()) {
       write(": " + generatedType + " = ");
     } else {
@@ -59,7 +59,7 @@ public:
   }
 
   void writeToFile(const std::string &fileName) {
-    std::ofstream file(fileName);
+    std::ofstream file("tests/" + fileName);
     file << output.str();
     file.close();
   }

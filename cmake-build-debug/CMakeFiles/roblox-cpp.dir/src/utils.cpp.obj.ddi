@@ -1,9 +1,0 @@
-{
-  "revision": 0,
-  "rules": [
-    {
-      "primary-output": "CMakeFiles\\roblox-cpp.dir\\src\\utils.cpp.obj"
-    }
-  ],
-  "version": 1
-}
