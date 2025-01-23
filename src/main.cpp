@@ -1,13 +1,14 @@
 #include <chrono>
 #include <clang-c/Index.h>
+#include <functional>
 #include <iostream>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include "luau-code-gen/LuauCodeGen.h"
 #include "utils.h"
 
 const std::string OUTPUT_FILENAME = "output.lua";
-
 
 class AstVisitor {
 public:
@@ -19,43 +20,76 @@ public:
       return CXChildVisit_Continue;
     }
 
-    CXCursorKind kind = clang_getCursorKind(cursor);
-    switch (kind) {
-      case CXCursor_FunctionDecl:
-        return handleFunctionDecl(cursor);
-      case CXCursor_VarDecl:
-        return handleVarDecl(cursor);
-      case CXCursor_ReturnStmt:
-        return handleReturnStmt(cursor);
-      case CXCursor_ForStmt:
-        return handleForStmt(cursor);
-      case CXCursor_UnexposedExpr:
-        return handleUnexpectedExpr(cursor);
-      case CXCursor_NamespaceRef:
-        return handleNamespaceRef(cursor);
-      case CXCursor_CallExpr:
-        return handleCallRef(cursor);
-      default:
-        const std::string spelling = utils::getCursorSpelling(cursor);
-        auto cursorKind = utils::getCursorKindSpelling(cursor);
+    const CXCursorKind kind = clang_getCursorKind(cursor);
+    const std::string kindSpelling = utils::getCursorKindSpelling(cursor);
+    // switch (kind) {
+    //   case CXCursor_FunctionDecl:
+    //     return handleFunctionDecl(cursor);
+    //   case CXCursor_VarDecl:
+    //     return handleVarDecl(cursor);
+    //   case CXCursor_ReturnStmt:
+    //     return handleReturnStmt(cursor);
+    //   case CXCursor_ForStmt:
+    //     return handleForStmt(cursor);
+    //   case CXCursor_UnexposedExpr:
+    //     return handleUnexpectedExpr(cursor);
+    //   case CXCursor_NamespaceRef:
+    //     return handleNamespaceRef(cursor);
+    //   case CXCursor_CallExpr:
+    //     return handleCallRef(cursor);
+    //   default:
+    //     const std::string spelling = utils::getCursorSpelling(cursor);
+    //     auto cursorKind = utils::getCursorKindSpelling(cursor);
+    //
+    //     if (!spelling.empty()) {
+    //       std::cout << "Unknown high-level cursor kind " << cursorKind << ". Spelling: " << spelling << std::endl;
+    //     } else {
+    //       std::cout << "Unknown high-level cursor kind " << cursorKind << ". Spelling empty. " << std::endl;
+    //     }
+    //     return CXChildVisit_Recurse;
+    // }
 
-        if (!spelling.empty()) {
-          std::cout << "Unknown high-level cursor kind " << cursorKind << ". Spelling: " << spelling << std::endl;
-        } else {
-          std::cout << "Unknown high-level cursor kind " << cursorKind << ". Spelling empty. " << std::endl;
-        }
-        return CXChildVisit_Recurse;
+    /* Experimental feature */
+    auto nodeHandleFn = methodMap.find(kind);
+    if (nodeHandleFn != methodMap.end()) {
+      return (nodeHandleFn->second)(this, cursor);
+    } else {
+      const std::string spelling = utils::getCursorSpelling(cursor);
+      if (!spelling.empty()) {
+        std::cout << "Unknown high-level cursor kind " << kindSpelling << ". Spelling: " << spelling << std::endl;
+      } else {
+        std::cout << "Unknown high-level cursor kind " << kindSpelling << ". Spelling empty. " << std::endl;
+      }
+      return CXChildVisit_Recurse;
     }
   }
 
   void setOutput(LuauCodeGen *_output) { output = _output; }
 
-  CXTranslationUnit getTranslationUnit() { return translationUnit_; }
+  [[nodiscard]] CXTranslationUnit getTranslationUnit() const { return translationUnit_; }
 
   void setTranslationUnit(CXTranslationUnit translationUnit) { translationUnit_ = translationUnit; }
 
 private:
-  bool isFromMainFile(const CXCursor &cursor) const {
+  static std::unordered_map<CXCursorKind, std::function<CXChildVisitResult(AstVisitor *, const CXCursor &)>>
+  createMethodMap() {
+    std::unordered_map<CXCursorKind, std::function<CXChildVisitResult(AstVisitor *, const CXCursor &)>> functionMap = {
+        {CXCursor_FunctionDecl, &AstVisitor::handleFunctionDecl},
+        {CXCursor_VarDecl, &AstVisitor::handleVarDecl},
+        {CXCursor_ReturnStmt, &AstVisitor::handleReturnStmt},
+        {CXCursor_ForStmt, &AstVisitor::handleForStmt},
+        {CXCursor_UnexposedExpr, &AstVisitor::handleUnexpectedExpr},
+        {CXCursor_NamespaceRef, &AstVisitor::handleNamespaceRef},
+        {CXCursor_CallExpr, &AstVisitor::handleCallRef}};
+    return functionMap;
+  }
+
+  friend std::unordered_map<CXCursorKind, std::function<CXChildVisitResult(AstVisitor *, const CXCursor &)>>
+  createMethodMap();
+  static inline std::unordered_map<CXCursorKind, std::function<CXChildVisitResult(AstVisitor *, const CXCursor &)>>
+      methodMap = createMethodMap();
+
+  [[nodiscard]] bool isFromMainFile(const CXCursor &cursor) const {
     CXSourceLocation location = clang_getCursorLocation(cursor);
     CXFile file;
     clang_getSpellingLocation(location, &file, nullptr, nullptr, nullptr);
@@ -80,7 +114,7 @@ private:
 
     clang_visitChildren(
         cursor,
-        [](CXCursor child, CXCursor parent, const CXClientData client_data) -> CXChildVisitResult {
+        [](CXCursor child, CXCursor parent, CXClientData client_data) -> CXChildVisitResult {
           if (clang_getCursorKind(child) == CXCursor_CompoundStmt) {
             const auto visitor = static_cast<AstVisitor *>(client_data);
             // Visit the children of the CompoundStmt
@@ -230,7 +264,6 @@ private:
         cursor,
         [](CXCursor child, CXCursor parent, CXClientData client_data) -> CXChildVisitResult {
           auto visitor = static_cast<AstVisitor *>(client_data);
-          auto output_string = static_cast<std::string *>(client_data);
           CXCursorKind child_cursor_kind = clang_getCursorKind(child);
           std::cout << child_cursor_kind << std::endl;
 
@@ -240,7 +273,7 @@ private:
             CXSourceLocation loc = clang_getCursorLocation(child);
             CXFile file;
             unsigned int line, column;
-            clang_getExpansionLocation(loc, &file, &line, &column, NULL);
+            clang_getExpansionLocation(loc, &file, &line, &column, nullptr);
 
             std::string filename = clang_getCString(clang_getFileName(file));
             // clang_getCursorLexicalParent(parent);
@@ -259,15 +292,13 @@ private:
   }
 
   CXChildVisitResult handleNamespaceRef(const CXCursor &cursor) {
-    std::string cursor_spelling = utils::getCursorSpelling(cursor);
+    const std::string cursor_spelling = utils::getCursorSpelling(cursor);
+    const CXCursor declCursor = clang_getCursorReferenced(cursor);
 
     if (cursor_spelling == "std") {
       std::cout << "Detected std namespace, skipping" << std::endl;
       return CXChildVisit_Continue;
     }
-    // std::cout << "Checking namespace: " << cursor_spelling << std::endl;
-
-    CXCursor declCursor = clang_getCursorReferenced(cursor);
 
     if (clang_Cursor_isNull(declCursor)) {
       std::cerr << "Error: Could not resolve namespace declaration." << std::endl;
@@ -288,11 +319,13 @@ private:
   }
 
   CXChildVisitResult handleCallRef(const CXCursor &cursor) {
-    std::string cursor_spelling = utils::getCursorSpelling(cursor);
-    auto test = clang_getCursorDisplayName(cursor);
+    const std::string cursor_spelling = utils::getCursorSpelling(cursor);
+    const CXString test = clang_getCursorDisplayName(cursor);
+
     std::cout << clang_getCString(test) << std::endl;
     clang_disposeString(test);
-    int numArgs = clang_Cursor_getNumArguments(cursor);
+
+    const int numArgs = clang_Cursor_getNumArguments(cursor);
     std::cout << "Call to function with " << numArgs << " arguments:" << std::endl;
 
     for (int i = 0; i < numArgs; i++) {
@@ -311,44 +344,24 @@ private:
   CXTranslationUnit translationUnit_;
 };
 
-int main(int argc, char *argv[]) {
+int main(const int argc, char *argv[]) {
   if (argc != 2) {
-    std::cerr << "Usage: " << argv[0] << " <source_file.cpp>" << std::endl;
+    std::cerr << "Incorrect Use! Proper Usage: " << argv[0] << " <source_file.cpp>" << std::endl;
     return 1;
   }
 
-  std::string mainSourceFile = argv[1];
+  const std::string mainSourceFile = argv[1];
 
   CXIndex index = clang_createIndex(0, 0);
   CXTranslationUnit unit =
       clang_parseTranslationUnit(index, mainSourceFile.c_str(), nullptr, 0, nullptr, 0, CXTranslationUnit_None);
-
   if (unit == nullptr) {
     std::cerr << "Error: Unable to parse translation unit." << std::endl;
     clang_disposeIndex(index);
     return 1;
   }
 
-  auto compile_start_time = std::chrono::high_resolution_clock::now();
-  int tests = 0;
-
-  // for (int i = 0; i < tests; i++) {
-  //   LuaOutput luaOutput;
-  //   luaOutput.writeLine("-- im mentally unstable now --");
-  //
-  //   AstVisitor visitor(mainSourceFile);
-  //   visitor.setOutput(&luaOutput);
-  //   visitor.setTranslationUnit(unit);
-  //
-  //   CXCursor rootCursor = clang_getTranslationUnitCursor(unit);
-  //   clang_visitChildren(
-  //       rootCursor,
-  //       [](CXCursor c, CXCursor p, CXClientData d) {
-  //         return static_cast<AstVisitor *>(d)->visit(c, p);
-  //       },
-  //       &visitor);
-  // }
-
+  const auto compileStartClock = std::chrono::high_resolution_clock::now();
   LuauCodeGen luaOutput;
   luaOutput.writeln("-- im mentally unstable now --");
 
@@ -356,7 +369,7 @@ int main(int argc, char *argv[]) {
   visitor.setOutput(&luaOutput);
   visitor.setTranslationUnit(unit);
 
-  CXCursor rootCursor = clang_getTranslationUnitCursor(unit);
+  const CXCursor rootCursor = clang_getTranslationUnitCursor(unit);
   clang_visitChildren(
       rootCursor, [](CXCursor c, CXCursor p, CXClientData d) { return static_cast<AstVisitor *>(d)->visit(c, p); },
       &visitor);
@@ -364,9 +377,10 @@ int main(int argc, char *argv[]) {
   luaOutput.writeToFile(OUTPUT_FILENAME);
   luaOutput.writeToConsole();
 
-  auto compile_end_time = std::chrono::high_resolution_clock::now();
-  auto compile_duration = std::chrono::duration_cast<std::chrono::milliseconds>(compile_end_time - compile_start_time);
-  printf("Time taken: %lld ms. Ran %d tests\n", compile_duration.count(), tests);
+  const auto compileEndClock = std::chrono::high_resolution_clock::now();
+  const auto compileDurationInMS =
+      std::chrono::duration_cast<std::chrono::milliseconds>(compileEndClock - compileStartClock);
+  printf("Time taken: %lld ms.", compileDurationInMS.count());
 
   clang_disposeTranslationUnit(unit);
   clang_disposeIndex(index);

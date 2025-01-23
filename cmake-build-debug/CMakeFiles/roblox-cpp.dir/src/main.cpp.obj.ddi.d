@@ -160,6 +160,11 @@ CMakeFiles\roblox-cpp.dir\src\main.cpp.obj.ddi: \
   C:\Program\ Files\LLVM\include\clang-c\CXDiagnostic.h \
   C:\Program\ Files\LLVM\include\clang-c\CXSourceLocation.h \
   C:\Program\ Files\LLVM\include\clang-c\CXFile.h \
+  C:\Program\ Files\Microsoft\ Visual\ Studio\2022\Community\VC\Tools\MSVC\14.42.34433\include\functional \
+  C:\Program\ Files\Microsoft\ Visual\ Studio\2022\Community\VC\Tools\MSVC\14.42.34433\include\unordered_map \
+  C:\Program\ Files\Microsoft\ Visual\ Studio\2022\Community\VC\Tools\MSVC\14.42.34433\include\xhash \
+  C:\Program\ Files\Microsoft\ Visual\ Studio\2022\Community\VC\Tools\MSVC\14.42.34433\include\list \
+  C:\Program\ Files\Microsoft\ Visual\ Studio\2022\Community\VC\Tools\MSVC\14.42.34433\include\xnode_handle.h \
   C:\Program\ Files\Microsoft\ Visual\ Studio\2022\Community\VC\Tools\MSVC\14.42.34433\include\iostream \
   C:\Users\bluec\Desktop\Projects\c++\roblox-cpp\src\luau-code-gen\LuauCodeGen.h \
   C:\Program\ Files\Microsoft\ Visual\ Studio\2022\Community\VC\Tools\MSVC\14.42.34433\include\fstream \
