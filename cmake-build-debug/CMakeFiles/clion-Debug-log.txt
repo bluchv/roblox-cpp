@@ -1,0 +1,6 @@
+C:\Users\bluec\AppData\Local\Programs\CLion\bin\cmake\win\x64\bin\cmake.exe -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=C:/Users/bluec/AppData/Local/Programs/CLion/bin/ninja/win/x64/ninja.exe -G Ninja -S C:\Users\bluec\Desktop\Projects\c++\roblox-cpp -B C:\Users\bluec\Desktop\Projects\c++\roblox-cpp\cmake-build-debug
+-- Clang package not found, falling back to manual mode. Please ensure LLVM is installed
+-- Found LibClang: C:/Program Files/LLVM/lib/libclang.lib
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: C:/Users/bluec/Desktop/Projects/c++/roblox-cpp/cmake-build-debug

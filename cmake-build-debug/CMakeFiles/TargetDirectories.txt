@@ -1,0 +1,3 @@
+C:/Users/bluec/Desktop/Projects/c++/roblox-cpp/cmake-build-debug/CMakeFiles/roblox-cpp.dir
+C:/Users/bluec/Desktop/Projects/c++/roblox-cpp/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Users/bluec/Desktop/Projects/c++/roblox-cpp/cmake-build-debug/CMakeFiles/rebuild_cache.dir

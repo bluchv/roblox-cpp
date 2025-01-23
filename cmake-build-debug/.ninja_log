@@ -1,0 +1,26 @@
+# ninja log v6
+3	94	7592938480712567	CMakeFiles/roblox-cpp.dir/src/main.cpp.obj.ddi	593c5deec24d0024
+6	86	7592935111155608	CMakeFiles/roblox-cpp.dir/src/utils.cpp.obj.ddi	7f32fa2b827b5f55
+94	118	7592938481623773	C:/Users/bluec/Desktop/Projects/c++/roblox-cpp/cmake-build-debug/CMakeFiles/roblox-cpp.dir/CXXModules.json	87ec05cfc259d087
+8	139	7592934209842550	CMakeFiles/roblox-cpp.dir/src/luau-code-gen/type-gen/LuauTypeGenerator.cpp.obj.ddi	e336837dd3a45f73
+94	118	7592938481623773	CMakeFiles/roblox-cpp.dir/src/main.cpp.obj.modmap	87ec05cfc259d087
+6	97	7592937609320461	CMakeFiles/roblox-cpp.dir/src/luau-code-gen/LuauCodeGen.cpp.obj.ddi	2d756f3af574851b
+94	118	7592938481623773	CMakeFiles/roblox-cpp.dir/CXX.dd	87ec05cfc259d087
+106	135	7592935112150628	CMakeFiles/roblox-cpp.dir/src/utils.cpp.obj.modmap	c9c203f454d70b65
+99	125	7592937610246858	CMakeFiles/roblox-cpp.dir/src/luau-code-gen/type-gen/LuauTypeGenerator.cpp.obj.modmap	7f0a453ed8ffc62c
+99	125	7592937610246858	CMakeFiles/roblox-cpp.dir/src/luau-code-gen/LuauCodeGen.cpp.obj.modmap	7f0a453ed8ffc62c
+139	388	7592935112479217	CMakeFiles/roblox-cpp.dir/src/utils.cpp.obj	10ed19d63c889f42
+182	608	7592934211579121	CMakeFiles/roblox-cpp.dir/src/luau-code-gen/type-gen/LuauTypeGenerator.cpp.obj	8601dc47f3c57b82
+130	739	7592937610563237	CMakeFiles/roblox-cpp.dir/src/luau-code-gen/LuauCodeGen.cpp.obj	a9dad1e837ac6ce9
+120	1102	7592938481884650	CMakeFiles/roblox-cpp.dir/src/main.cpp.obj	955dc722348c1418
+1102	1205	7592938491705111	roblox-cpp.exe	27d0901483b0ede8
+2	176	7592938510476663	build.ninja	99786cf6b4f08cff
+2	26	7592938528859129	CMakeFiles/roblox-cpp.dir/CXX.dd	87ec05cfc259d087
+2	26	7592938528859129	C:/Users/bluec/Desktop/Projects/c++/roblox-cpp/cmake-build-debug/CMakeFiles/roblox-cpp.dir/CXXModules.json	87ec05cfc259d087
+2	26	7592938528859129	CMakeFiles/roblox-cpp.dir/src/main.cpp.obj.modmap	87ec05cfc259d087
+3	99	7592940316166722	CMakeFiles/roblox-cpp.dir/src/main.cpp.obj.ddi	593c5deec24d0024
+99	122	7592940317133258	CMakeFiles/roblox-cpp.dir/CXX.dd	87ec05cfc259d087
+99	122	7592940317133258	C:/Users/bluec/Desktop/Projects/c++/roblox-cpp/cmake-build-debug/CMakeFiles/roblox-cpp.dir/CXXModules.json	87ec05cfc259d087
+99	122	7592940317133258	CMakeFiles/roblox-cpp.dir/src/main.cpp.obj.modmap	87ec05cfc259d087
+123	980	7592940317378634	CMakeFiles/roblox-cpp.dir/src/main.cpp.obj	955dc722348c1418
+981	1084	7592940325948931	roblox-cpp.exe	27d0901483b0ede8
