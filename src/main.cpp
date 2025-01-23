@@ -37,10 +37,12 @@ public:
         return handleCallRef(cursor);
       default:
         const std::string spelling = utils::getCursorSpelling(cursor);
+        auto cursorKind = utils::getCursorKindSpelling(cursor);
+
         if (!spelling.empty()) {
-          std::cout << "Unknown high-level cursor kind " << kind << ". Spelling: " << spelling << std::endl;
+          std::cout << "Unknown high-level cursor kind " << cursorKind << ". Spelling: " << spelling << std::endl;
         } else {
-          std::cout << "Unknown high-level cursor kind " << kind << ". Spelling empty. " << std::endl;
+          std::cout << "Unknown high-level cursor kind " << cursorKind << ". Spelling empty. " << std::endl;
         }
         return CXChildVisit_Recurse;
     }
@@ -112,7 +114,7 @@ private:
 
     clang_visitChildren(
         cursor,
-        [](CXCursor child, CXCursor parent, const CXClientData client_data) -> CXChildVisitResult {
+        [](CXCursor child, CXCursor parent, CXClientData client_data) -> CXChildVisitResult {
           auto visitor = static_cast<AstVisitor *>(client_data);
           LuauCodeGen *output = visitor->output;
 
@@ -265,16 +267,13 @@ private:
     }
     // std::cout << "Checking namespace: " << cursor_spelling << std::endl;
 
-    // Get the referenced namespace declaration
     CXCursor declCursor = clang_getCursorReferenced(cursor);
 
-    // Check if the declaration is valid
     if (clang_Cursor_isNull(declCursor)) {
       std::cerr << "Error: Could not resolve namespace declaration." << std::endl;
       return CXChildVisit_Continue;
     }
 
-    // Get the location of the namespace declaration
     CXSourceLocation declLocation = clang_getCursorLocation(declCursor);
     CXFile declFile;
     unsigned int declLine, declColumn, declOffset;

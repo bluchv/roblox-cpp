@@ -17,7 +17,13 @@ namespace utils {
     return result;
   }
 
-  inline std::string getCursorKind(CXCursorKind kind);
+  inline std::string getCursorKindSpelling(const CXCursor &cursor) {
+    const auto kind = clang_getCursorKind(cursor);
+    const CXString spelling = clang_getCursorKindSpelling(kind);
+    std::string kindStr = clang_getCString(spelling);
+    clang_disposeString(spelling);
+    return kindStr;
+  }
 
   inline std::string getIntegerLiteralValue(const CXCursor &cursor, CXTranslationUnit translationUnit) {
     CXToken *tokens;
