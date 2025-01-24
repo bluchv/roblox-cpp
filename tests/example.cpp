@@ -1,6 +1,6 @@
-#include "../include/roblox.h"
 #include <iostream>
 #include <stdio.h>
+#include "../include/roblox.h"
 
 using namespace Roblox::Services;
 using namespace Roblox;
@@ -18,7 +18,9 @@ int get_number() {
   return y;
 }
 
+void pointerTest(int var) { }
+
 int main() {
-  int x = get_number();
+  //  int x = get_number();
   return 0;
 }

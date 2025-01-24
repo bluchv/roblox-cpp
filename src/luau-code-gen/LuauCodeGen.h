@@ -14,7 +14,7 @@
 
 class LuauCodeGen {
 public:
-  LuauCodeGen() : indent_level(0) {};
+  LuauCodeGen() : indent_level(0), function_params(0) {};
 
   void indent() {
     for (int i = 0; i < indent_level; i++) {
@@ -32,13 +32,30 @@ public:
     output << "\n";
   }
 
-  void writefn(const std::string &functionName, const std::string &returnType) {
-    auto generatedReturnType = LuauTypeGenerator::generateType(returnType);
-    if (!generatedReturnType.empty()) {
-      writeln("local function " + functionName + "(): " + generatedReturnType);
+  void writefn(const std::string &functionName) {
+    function_params = 0;
+    write("local function " + functionName + "(");
+  }
+
+  void writeFnParam(const std::string &paramName, const std::string &paramType) {
+    const std::string generatedType = LuauTypeGenerator::generateType(paramType);
+    if (function_params > 0) {
+      write(", " + paramName + (!generatedType.empty() ? ": " + generatedType : ""));
     } else {
-      writeln("local function " + functionName + "()");
+      write(paramName + (!generatedType.empty() ? ": " + generatedType : ""));
     }
+    function_params++;
+  }
+
+  void finishFnDecl(const std::string &returnType) {
+    const std::string generatedType = LuauTypeGenerator::generateType(returnType);
+    if (!generatedType.empty()) {
+      write("): " + generatedType);
+    } else {
+      write(")");
+    }
+    write("\n");
+    function_params = 0;
     increaseIndent();
   }
 
@@ -76,6 +93,7 @@ public:
 private:
   std::stringstream output;
   int indent_level;
+  int function_params;
 };
 
 

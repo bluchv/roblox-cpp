@@ -66,9 +66,7 @@ public:
   }
 
   void setOutput(LuauCodeGen *_output) { output = _output; }
-
   [[nodiscard]] CXTranslationUnit getTranslationUnit() const { return translationUnit_; }
-
   void setTranslationUnit(CXTranslationUnit translationUnit) { translationUnit_ = translationUnit; }
 
 private:
@@ -92,14 +90,39 @@ private:
     CXType returnType = clang_getCursorResultType(cursor);
     CXString typeSpelling = clang_getTypeSpelling(returnType);
     auto typeSpellingC = clang_getCString(typeSpelling);
-    output->writefn(functionName, typeSpellingC);
+    output->writefn(functionName);
     clang_disposeString(typeSpelling);
 
+    // Write args
     clang_visitChildren(
         cursor,
         [](CXCursor child, CXCursor parent, CXClientData client_data) -> CXChildVisitResult {
+          const auto visitor = static_cast<AstVisitor *>(client_data);
+          if (clang_getCursorKind(child) == CXCursor_ParmDecl) {
+            const std::string name = utils::getCursorSpelling(child);
+            const std::string kind = utils::getCursorKindSpelling(child);
+            const CXString typeSpelling = clang_getTypeSpelling(clang_getCursorType(child));
+            const std::string type = clang_getCString(typeSpelling);
+
+            clang_disposeString(typeSpelling);
+            // auto type = clang_getCString(clang_getTypeSpelling(clang_getCursorType(child)));
+            // std::cout << name << " " << kind << std::endl;
+
+            visitor->output->writeFnParam(name, type);
+            return CXChildVisit_Continue;
+          }
+          return CXChildVisit_Continue;
+        },
+        this);
+
+    output->finishFnDecl(typeSpellingC);
+
+    // Write fn body
+    clang_visitChildren(
+        cursor,
+        [](CXCursor child, CXCursor parent, CXClientData client_data) -> CXChildVisitResult {
+          const auto visitor = static_cast<AstVisitor *>(client_data);
           if (clang_getCursorKind(child) == CXCursor_CompoundStmt) {
-            const auto visitor = static_cast<AstVisitor *>(client_data);
             clang_visitChildren(
                 child,
                 [](CXCursor c, CXCursor p, CXClientData d) -> CXChildVisitResult {
@@ -163,7 +186,7 @@ private:
 
             return CXChildVisit_Break;
           } else {
-            std::cout << "Unknown cursor-child kind: " << cursorKind << std::endl;
+            std::cout << "Unknown cursor-child kind: " << utils::getCursorKindSpelling(child) << std::endl;
           }
           return CXChildVisit_Recurse;
         },
@@ -238,14 +261,14 @@ private:
   CXChildVisitResult handleUnexpectedExpr(const CXCursor &cursor) {
     std::string cursor_spelling = utils::getCursorSpelling(cursor);
     auto cursor_kind = clang_getCursorKind(cursor);
-    std::cout << cursor_kind << " + " << cursor_spelling << std::endl;
+    // std::cout << cursor_kind << " + " << cursor_spelling << std::endl;
 
     clang_visitChildren(
         cursor,
         [](CXCursor child, CXCursor parent, CXClientData client_data) -> CXChildVisitResult {
           auto visitor = static_cast<AstVisitor *>(client_data);
           CXCursorKind child_cursor_kind = clang_getCursorKind(child);
-          std::cout << child_cursor_kind << std::endl;
+          // std::cout << child_cursor_kind << std::endl;
 
           auto child_spelling = utils::getCursorSpelling(child);
           auto isInIgnoreTable = std::find(utils::IgnoreMap.begin(), utils::IgnoreMap.end(), child_spelling);
@@ -341,6 +364,21 @@ private:
     return CXChildVisit_Continue;
   }
 
+  CXChildVisitResult usingDirective(const CXCursor &cursor) {
+    clang_visitChildren(
+        cursor,
+        [](CXCursor child, CXCursor parent, CXClientData client_data) -> CXChildVisitResult {
+          auto visitor = static_cast<AstVisitor *>(client_data);
+
+          const std::string cursorSpelling = utils::getCursorSpelling(child);
+          const std::string cursorKindSpelling = utils::getCursorKindSpelling(child);
+          std::cout << cursorKindSpelling << " " << cursorSpelling << std::endl;
+          return CXChildVisit_Continue;
+        },
+        this);
+    return CXChildVisit_Continue;
+  }
+
   static std::unordered_map<CXCursorKind, std::function<CXChildVisitResult(AstVisitor *, const CXCursor &)>>
   createMethodMap() {
     std::unordered_map<CXCursorKind, std::function<CXChildVisitResult(AstVisitor *, const CXCursor &)>> functionMap = {
@@ -351,7 +389,8 @@ private:
         {CXCursor_UnexposedExpr, &AstVisitor::handleUnexpectedExpr},
         {CXCursor_NamespaceRef, &AstVisitor::handleNamespaceRef},
         // {CXCursor_CallExpr, &AstVisitor::handleCallRef},
-        {CXCursor_DeclStmt, &AstVisitor::declStmt}};
+        {CXCursor_DeclStmt, &AstVisitor::declStmt},
+        {CXCursor_UsingDirective, &AstVisitor::usingDirective}};
     return functionMap;
   }
 
