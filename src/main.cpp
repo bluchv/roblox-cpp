@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <clang-c/Index.h>
 #include <functional>
@@ -71,24 +72,6 @@ public:
   void setTranslationUnit(CXTranslationUnit translationUnit) { translationUnit_ = translationUnit; }
 
 private:
-  static std::unordered_map<CXCursorKind, std::function<CXChildVisitResult(AstVisitor *, const CXCursor &)>>
-  createMethodMap() {
-    std::unordered_map<CXCursorKind, std::function<CXChildVisitResult(AstVisitor *, const CXCursor &)>> functionMap = {
-        {CXCursor_FunctionDecl, &AstVisitor::handleFunctionDecl},
-        {CXCursor_VarDecl, &AstVisitor::handleVarDecl},
-        {CXCursor_ReturnStmt, &AstVisitor::handleReturnStmt},
-        {CXCursor_ForStmt, &AstVisitor::handleForStmt},
-        {CXCursor_UnexposedExpr, &AstVisitor::handleUnexpectedExpr},
-        {CXCursor_NamespaceRef, &AstVisitor::handleNamespaceRef},
-        {CXCursor_CallExpr, &AstVisitor::handleCallRef}};
-    return functionMap;
-  }
-
-  friend std::unordered_map<CXCursorKind, std::function<CXChildVisitResult(AstVisitor *, const CXCursor &)>>
-  createMethodMap();
-  static inline std::unordered_map<CXCursorKind, std::function<CXChildVisitResult(AstVisitor *, const CXCursor &)>>
-      methodMap = createMethodMap();
-
   [[nodiscard]] bool isFromMainFile(const CXCursor &cursor) const {
     CXSourceLocation location = clang_getCursorLocation(cursor);
     CXFile file;
@@ -117,15 +100,12 @@ private:
         [](CXCursor child, CXCursor parent, CXClientData client_data) -> CXChildVisitResult {
           if (clang_getCursorKind(child) == CXCursor_CompoundStmt) {
             const auto visitor = static_cast<AstVisitor *>(client_data);
-            // Visit the children of the CompoundStmt
             clang_visitChildren(
                 child,
                 [](CXCursor c, CXCursor p, CXClientData d) -> CXChildVisitResult {
                   return static_cast<AstVisitor *>(d)->visit(c, p);
                 },
                 visitor);
-            // Return CXChildVisit_Continue to continue visiting other children
-            // of the function
             return CXChildVisit_Continue;
           }
           return CXChildVisit_Continue;
@@ -281,8 +261,13 @@ private:
             //  handleUnexpectedExpr, visit all the nodes in there, if they're
             //  strings, add it to the print statement
 
-            visitor->output->writeln(std::format("print(\"[{} - Line {}]:\", {})",
-                                                 filename.erase(0, filename.find("c++") + 4), line, child_spelling));
+            char oldChar = *"\\";
+            char newChar = *"/";
+            std::string fileNameStr = filename.erase(0, filename.find("c++") + 4);
+            std::transform(fileNameStr.begin(), fileNameStr.end(), fileNameStr.begin(),
+                           [oldChar, newChar](char c) { return (c == oldChar) ? newChar : c; });
+
+            visitor->output->writeln(std::format("print(\"[{} - Line {}]:\", {})", fileNameStr, line, child_spelling));
           }
           return CXChildVisit_Continue;
         },
@@ -325,19 +310,55 @@ private:
     std::cout << clang_getCString(test) << std::endl;
     clang_disposeString(test);
 
-    const int numArgs = clang_Cursor_getNumArguments(cursor);
-    std::cout << "Call to function with " << numArgs << " arguments:" << std::endl;
-
-    for (int i = 0; i < numArgs; i++) {
-      CXCursor argCursor = clang_Cursor_getArgument(cursor, i);
-      CXString argSpelling = clang_getCursorSpelling(argCursor);
-
-      std::cout << "  Argument " << i << ": " << clang_getCString(argSpelling) << std::endl;
-      clang_disposeString(argSpelling);
-    }
+    // const int numArgs = clang_Cursor_getNumArguments(cursor);
+    // std::cout << "Call to function with " << numArgs << " arguments:" << std::endl;
+    //
+    // for (int i = 0; i < numArgs; i++) {
+    //   CXCursor argCursor = clang_Cursor_getArgument(cursor, i);
+    //   CXString argSpelling = clang_getCursorSpelling(argCursor);
+    //
+    //   std::cout << "  Argument " << i << ": " << clang_getCString(argSpelling) << std::endl;
+    //   clang_disposeString(argSpelling);
+    // }
 
     return CXChildVisit_Continue;
   }
+
+  CXChildVisitResult declStmt(const CXCursor &cursor) {
+    const std::string cursor_spelling = utils::getCursorSpelling(cursor);
+    const CXCursor declCursor = clang_getCursorReferenced(cursor);
+    const std::string decl_spelling = utils::getCursorSpelling(declCursor);
+
+    clang_visitChildren(
+        cursor,
+        [](CXCursor child, CXCursor parent, CXClientData client_data) -> CXChildVisitResult {
+          auto visitor = static_cast<AstVisitor *>(client_data);
+          visitor->visit(child, parent);
+          return CXChildVisit_Continue;
+        },
+        this);
+
+    return CXChildVisit_Continue;
+  }
+
+  static std::unordered_map<CXCursorKind, std::function<CXChildVisitResult(AstVisitor *, const CXCursor &)>>
+  createMethodMap() {
+    std::unordered_map<CXCursorKind, std::function<CXChildVisitResult(AstVisitor *, const CXCursor &)>> functionMap = {
+        {CXCursor_FunctionDecl, &AstVisitor::handleFunctionDecl},
+        {CXCursor_VarDecl, &AstVisitor::handleVarDecl},
+        {CXCursor_ReturnStmt, &AstVisitor::handleReturnStmt},
+        {CXCursor_ForStmt, &AstVisitor::handleForStmt},
+        {CXCursor_UnexposedExpr, &AstVisitor::handleUnexpectedExpr},
+        {CXCursor_NamespaceRef, &AstVisitor::handleNamespaceRef},
+        // {CXCursor_CallExpr, &AstVisitor::handleCallRef},
+        {CXCursor_DeclStmt, &AstVisitor::declStmt}};
+    return functionMap;
+  }
+
+  friend std::unordered_map<CXCursorKind, std::function<CXChildVisitResult(AstVisitor *, const CXCursor &)>>
+  createMethodMap();
+  static inline std::unordered_map<CXCursorKind, std::function<CXChildVisitResult(AstVisitor *, const CXCursor &)>>
+      methodMap = createMethodMap();
 
   std::string mainSourceFile_;
   LuauCodeGen *output;

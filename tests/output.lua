@@ -4,6 +4,7 @@ local testVar2: string = "Hello c++!"
 local function something(): nil
   for i = 0, 49 do
   end
+  print("[roblox-cpp/tests/example.cpp - Line 13]:", "Hi")
 end
 local function get_number(): number
   local y: number = 20

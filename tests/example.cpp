@@ -10,6 +10,7 @@ const char *testVar2 = "Hello c++!";
 
 void something() {
   for (int i = 0; i < 50; i++) { }
+  std::cout << "Hi" << std::endl;
 }
 
 int get_number() {
