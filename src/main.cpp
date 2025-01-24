@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include "luau-ast/luau_ast_generator.h"
 #include "luau-code-gen/LuauCodeGen.h"
 #include "utils.h"
 
@@ -183,7 +184,7 @@ private:
 
             output->removeTrailingComma();
             output->write(")\n");
-
+            // visitor->visit(child, parent);
             return CXChildVisit_Break;
           } else {
             std::cout << "Unknown cursor-child kind: " << utils::getCursorKindSpelling(child) << std::endl;
@@ -379,6 +380,31 @@ private:
     return CXChildVisit_Continue;
   }
 
+  CXChildVisitResult callExpr(const CXCursor &cursor) {
+    std::string calledFunctionName = utils::getCursorSpelling(clang_getCursorReferenced(cursor));
+    output->indent();
+    output->write(calledFunctionName + "(");
+
+    clang_visitChildren(
+        cursor,
+        [](CXCursor arg, CXCursor parent, CXClientData client_data) {
+          auto output = static_cast<LuauCodeGen *>(client_data);
+          std::string calledFunctionName = utils::getCursorSpelling(clang_getCursorReferenced(parent));
+          const std::string name = utils::getCursorSpelling(arg);
+
+          if (name != calledFunctionName) {
+            output->write(name);
+          }
+
+          return CXChildVisit_Continue;
+        },
+        output);
+
+    output->removeTrailingComma();
+    output->write(")\n");
+    return CXChildVisit_Continue;
+  }
+
   static std::unordered_map<CXCursorKind, std::function<CXChildVisitResult(AstVisitor *, const CXCursor &)>>
   createMethodMap() {
     std::unordered_map<CXCursorKind, std::function<CXChildVisitResult(AstVisitor *, const CXCursor &)>> functionMap = {
@@ -390,7 +416,9 @@ private:
         {CXCursor_NamespaceRef, &AstVisitor::handleNamespaceRef},
         // {CXCursor_CallExpr, &AstVisitor::handleCallRef},
         {CXCursor_DeclStmt, &AstVisitor::declStmt},
-        {CXCursor_UsingDirective, &AstVisitor::usingDirective}};
+        {CXCursor_UsingDirective, &AstVisitor::usingDirective},
+        {CXCursor_CallExpr, &AstVisitor::callExpr},
+    };
     return functionMap;
   }
 
@@ -405,44 +433,45 @@ private:
 };
 
 int main(const int argc, char *argv[]) {
-  if (argc != 2) {
-    std::cerr << "Incorrect Use! Proper Usage: " << argv[0] << " <source_file.cpp>" << std::endl;
-    return 1;
-  }
-
-  const std::string mainSourceFile = argv[1];
-
-  CXIndex index = clang_createIndex(0, 0);
-  CXTranslationUnit unit =
-      clang_parseTranslationUnit(index, mainSourceFile.c_str(), nullptr, 0, nullptr, 0, CXTranslationUnit_None);
-  if (unit == nullptr) {
-    std::cerr << "Error: Unable to parse translation unit." << std::endl;
-    clang_disposeIndex(index);
-    return 1;
-  }
-
-  const auto compileStartClock = std::chrono::high_resolution_clock::now();
-  LuauCodeGen luaOutput;
-  luaOutput.writeln("-- im mentally unstable now --");
-
-  AstVisitor visitor(mainSourceFile);
-  visitor.setOutput(&luaOutput);
-  visitor.setTranslationUnit(unit);
-
-  const CXCursor rootCursor = clang_getTranslationUnitCursor(unit);
-  clang_visitChildren(
-      rootCursor, [](CXCursor c, CXCursor p, CXClientData d) { return static_cast<AstVisitor *>(d)->visit(c, p); },
-      &visitor);
-
-  luaOutput.writeToFile(OUTPUT_FILENAME);
-  luaOutput.writeToConsole();
-
-  const auto compileEndClock = std::chrono::high_resolution_clock::now();
-  const auto compileDurationInMS =
-      std::chrono::duration_cast<std::chrono::milliseconds>(compileEndClock - compileStartClock);
-  printf("Time taken: %lld ms.", compileDurationInMS.count());
-
-  clang_disposeTranslationUnit(unit);
-  clang_disposeIndex(index);
+  luau_ast_generator generator;
+  // if (argc != 2) {
+  //   std::cerr << "Incorrect Use! Proper Usage: " << argv[0] << " <source_file.cpp>" << std::endl;
+  //   return 1;
+  // }
+  //
+  // const std::string mainSourceFile = argv[1];
+  //
+  // CXIndex index = clang_createIndex(0, 0);
+  // CXTranslationUnit unit =
+  //     clang_parseTranslationUnit(index, mainSourceFile.c_str(), nullptr, 0, nullptr, 0, CXTranslationUnit_None);
+  // if (unit == nullptr) {
+  //   std::cerr << "Error: Unable to parse translation unit." << std::endl;
+  //   clang_disposeIndex(index);
+  //   return 1;
+  // }
+  //
+  // const auto compileStartClock = std::chrono::high_resolution_clock::now();
+  // LuauCodeGen luaOutput;
+  // luaOutput.writeln("-- im mentally unstable now --");
+  //
+  // AstVisitor visitor(mainSourceFile);
+  // visitor.setOutput(&luaOutput);
+  // visitor.setTranslationUnit(unit);
+  //
+  // const CXCursor rootCursor = clang_getTranslationUnitCursor(unit);
+  // clang_visitChildren(
+  //     rootCursor, [](CXCursor c, CXCursor p, CXClientData d) { return static_cast<AstVisitor *>(d)->visit(c, p); },
+  //     &visitor);
+  //
+  // luaOutput.writeToFile(OUTPUT_FILENAME);
+  // luaOutput.writeToConsole();
+  //
+  // const auto compileEndClock = std::chrono::high_resolution_clock::now();
+  // const auto compileDurationInMS =
+  //     std::chrono::duration_cast<std::chrono::milliseconds>(compileEndClock - compileStartClock);
+  // printf("Time taken: %lld ms.", compileDurationInMS.count());
+  //
+  // clang_disposeTranslationUnit(unit);
+  // clang_disposeIndex(index);
   return 0;
 }

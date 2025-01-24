@@ -10,7 +10,7 @@ const char *testVar2 = "Hello c++!";
 
 void something() {
   for (int i = 0; i < 50; i++) { }
-  std::cout << "Hi" << std::endl;
+//  std::cout << "Hi" << std::endl;
 }
 
 int get_number() {
@@ -18,9 +18,12 @@ int get_number() {
   return y;
 }
 
-void pointerTest(int var) { }
+void printTest(int var) {
+//  std::cout << var << std::endl;
+}
 
 int main() {
-  //  int x = get_number();
+  int x = get_number();
+  printTest(x);
   return 0;
 }

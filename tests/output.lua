@@ -4,14 +4,15 @@ local testVar2: string = "Hello c++!"
 local function something()
   for i = 0, 49 do
   end
-  print("[roblox-cpp/tests/example.cpp - Line 13]:", "Hi")
 end
 local function get_number()
   local y: number = 20
   return y
 end
-local function pointerTest(var: number)
+local function printTest(var: number)
 end
 local function main()
+  local x: number = get_number()
+  printTest(x)
   return 0
 end
