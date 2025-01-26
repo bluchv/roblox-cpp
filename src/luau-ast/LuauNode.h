@@ -5,6 +5,7 @@
 #ifndef LUAU_NODE_H
 #define LUAU_NODE_H
 
+#include <any>
 #include <array>
 #include <string>
 #include <variant>

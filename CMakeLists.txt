@@ -30,9 +30,7 @@ endif ()
 add_executable(roblox-cpp src/main.cpp
         include/roblox.h
         src/luau-code-gen/LuauCodeGen.h
-        src/luau-ast/luau_ast_generator.h
+        src/luau-ast/LuauAstGenerator.h
         src/luau-ast/LuauNode.h
-        src/luau-ast/test_node.h
-        src/luau-ast/function.h
-        src/luau-ast/variable.h
-        src/luau-ast/util.h)
+        src/luau-ast/Function.h
+        src/luau-ast/Variable.h)
