@@ -6,6 +6,10 @@ of learning C++. I've noticed rust is probably better lol, but there's already m
 will continue learning C++ for anything practical, and just learn rust later if I need it. But I thought this would
 still be a fun project to do and learn from.
 
+## Community
+
+I have decided to make a server for this, for a personal log sort of. Join here: https://discord.gg/m5HEJMzsNA
+
 ## Feedback
 
 If you have any feedback, please reach out to me on discord @ blu.ee

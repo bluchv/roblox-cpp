@@ -46,7 +46,7 @@ public:
   void setTranslationUnit(CXTranslationUnit translationUnit) { translationUnit_ = translationUnit; }
   void setRootNode(LuauNode *rootNode) { root = rootNode; };
   [[nodiscard]] CXTranslationUnit getTranslationUnit() const { return translationUnit_; }
-  LuauNode *root;
+  LuauNode *root{};
 
 private:
   [[nodiscard]] bool isFromMainFile(const CXCursor &cursor) const {
@@ -73,7 +73,7 @@ private:
       FunctionNode *parentNode;
     };
 
-    FunctionNode *newFunction = new FunctionNode(functionName);
+    auto *newFunction = new FunctionNode(functionName);
     ClientData clientData = {this, newFunction};
 
     // Write args
@@ -136,7 +136,10 @@ private:
 
           if (cursorKind == CXCursor_IntegerLiteral) {
             std::string intValue = utils::getIntegerLiteralValue(child, visitor->getTranslationUnit());
-            auto *variable = new VariableNode(varName, std::atoi(intValue.c_str()));
+            auto *variable =
+                new VariableNode(varName,
+                                 std::atoi( // NOLINT(*-err34-c) // We dont need error handling, plus this is temporary
+                                     intValue.c_str()));
             parentNode->addChild(variable);
             return CXChildVisit_Break;
           } else if (cursorKind == CXCursor_StringLiteral) {
@@ -186,8 +189,7 @@ int main(const int argc, char *argv[]) {
   }
 
   const std::string mainSourceFile = argv[1];
-
-  CXIndex index = clang_createIndex(0, 0);
+  const CXIndex index = clang_createIndex(0, 0);
   CXTranslationUnit unit =
       clang_parseTranslationUnit(index, mainSourceFile.c_str(), nullptr, 0, nullptr, 0, CXTranslationUnit_None);
   if (unit == nullptr) {
@@ -197,28 +199,31 @@ int main(const int argc, char *argv[]) {
   }
 
   const auto compileStartClock = std::chrono::high_resolution_clock::now();
-
-  LuauNode root;
-  LuauCodeGen luaOutput;
-  luaOutput.writeln("-- im mentally unstable now --");
-
-  AstVisitor visitor(mainSourceFile);
-  visitor.setTranslationUnit(unit);
-
   const CXCursor rootCursor = clang_getTranslationUnitCursor(unit);
-  visitor.setRootNode(&root);
+  LuauNode rootNode;
+  LuauCodeGen luaOutput;
+  AstVisitor visitor(mainSourceFile);
+
+  // Top level things
+  luaOutput.writeln("-- im mentally unstable now --");
+  visitor.setTranslationUnit(unit);
+  visitor.setRootNode(&rootNode);
+
+  // Traverse the ast
   clang_visitChildren(
       rootCursor,
       [](CXCursor c, CXCursor p, CXClientData d) {
-        auto visitor = static_cast<AstVisitor *>(d);
-        return visitor->visit(c, visitor->root);
+        const auto astVisitor = static_cast<AstVisitor *>(d);
+        return astVisitor->visit(c, astVisitor->root);
       },
       &visitor);
 
-  root.render(luaOutput);
+  // Render luau ast
+  rootNode.render(luaOutput);
   luaOutput.writeToFile(OUTPUT_FILENAME);
   luaOutput.writeToConsole();
 
+  // Debugging/performance info
   const auto compileEndClock = std::chrono::high_resolution_clock::now();
   const auto compileDurationInMS =
       std::chrono::duration_cast<std::chrono::milliseconds>(compileEndClock - compileStartClock);
