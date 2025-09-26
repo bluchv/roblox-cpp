@@ -1,235 +1,102 @@
-#include <algorithm>
-#include <chrono>
-#include <clang-c/Index.h>
-#include <cstdio>
-#include <functional>
+#include <filesystem>
 #include <iostream>
 #include <string>
-#include <unordered_map>
-#include <utility>
-#include "luau-ast/LuauAstGenerator.h"
-#include "luau-code-gen/LuauCodeGen.h"
-#include "utils.h"
+#include "transpiler/transpiler.h"
 
-const std::string OUTPUT_FILENAME = "output.lua";
+void printUsage(const char *programName) {
+  std::cout << "Roblox C++ to Luau Transpiler\n";
+  std::cout << "Usage: " << programName << " [options] <input_file.cpp>\n\n";
+  std::cout << "Options:\n";
+  std::cout << "  -o <output_file>  Specify output file (default: tests/output/output.luau)\n";
+  std::cout << "  -b, --bootstrap   Generate bootstrapper file (default: tests/output/bootstrap.luau)\n";
+  std::cout << "  -v, --verbose     Enable verbose output\n";
+  std::cout << "  -h, --help        Show this help message\n";
+  std::cout << "\nExample:\n";
+  std::cout << "  " << programName << " -o tests/output/game.luau -b tests/input/main.cpp\n";
+}
 
-class AstVisitor {
-public:
-  explicit AstVisitor(std::string mainSourceFile) :
-      mainSourceFile_(std::move(mainSourceFile)), translationUnit_(nullptr) {}
+int main(int argc, char *argv[]) {
+  if (argc < 2) {
+    printUsage(argv[0]);
+    return 1;
+  }
+  std::string inputFile;
+  std::string outputFile;
+  bool verbose = false;
+  bool generateBootstrapper = false;
 
-  template<typename T>
-  CXChildVisitResult visit(const CXCursor &cursor, T &parent) {
-    if (!isFromMainFile(cursor)) {
-      return CXChildVisit_Continue;
+  // Parse command line arguments
+  for (int i = 1; i < argc; ++i) {
+    std::string arg = argv[i];
+
+    if (arg == "-h" || arg == "--help") {
+      printUsage(argv[0]);
+      return 0;
+    } else if (arg == "-v" || arg == "--verbose") {
+      verbose = true;
+    } else if (arg == "-b" || arg == "--bootstrap") {
+      generateBootstrapper = true;
+    } else if (arg == "-o" && i + 1 < argc) {
+      outputFile = argv[++i];
+    } else if (arg[0] != '-') {
+      if (inputFile.empty()) {
+        inputFile = arg;
+      } else {
+        std::cerr << "Error: Multiple input files specified. Only one is supported.\n";
+        return 1;
+      }
+    } else {
+      std::cerr << "Error: Unknown option: " << arg << "\n";
+      printUsage(argv[0]);
+      return 1;
     }
-
-    const CXCursorKind kind = clang_getCursorKind(cursor);
-    const std::string kindSpelling = utils::getCursorKindSpelling(cursor);
-
-    switch (kind) {
-      case CXCursor_FunctionDecl:
-        return handleFunctionDecl(cursor, parent);
-      case CXCursor_VarDecl:
-        return handleVarDecl(cursor, parent);
-      default:
-        const std::string spelling = utils::getCursorSpelling(cursor);
-        if (!spelling.empty()) {
-          std::cout << "Unknown high-level cursor kind " << kindSpelling << ". Spelling: " << spelling << std::endl;
-        } else {
-          std::cout << "Unknown high-level cursor kind " << kindSpelling << ". Spelling empty. " << std::endl;
-        }
-        return CXChildVisit_Recurse;
-    }
   }
 
-  void setTranslationUnit(CXTranslationUnit translationUnit) { translationUnit_ = translationUnit; }
-  void setRootNode(LuauNode *rootNode) { root = rootNode; };
-  [[nodiscard]] CXTranslationUnit getTranslationUnit() const { return translationUnit_; }
-  LuauNode *root{};
-
-private:
-  [[nodiscard]] bool isFromMainFile(const CXCursor &cursor) const {
-    CXSourceLocation location = clang_getCursorLocation(cursor);
-    CXFile file;
-    clang_getSpellingLocation(location, &file, nullptr, nullptr, nullptr);
-
-    if (file == nullptr)
-      return false;
-
-    CXString fileName = clang_getFileName(file);
-    std::string fileNameStr = clang_getCString(fileName);
-    clang_disposeString(fileName);
-
-    return fileNameStr == mainSourceFile_;
-  }
-
-  template<typename T>
-  CXChildVisitResult handleFunctionDecl(const CXCursor &cursor, T &parentNode) {
-    std::string functionName = utils::getCursorSpelling(cursor);
-
-    struct ClientData {
-      AstVisitor *visitor;
-      FunctionNode *parentNode;
-    };
-
-    auto *newFunction = new FunctionNode(functionName);
-    ClientData clientData = {this, newFunction};
-
-    // Write args
-    clang_visitChildren(
-        cursor,
-        [](CXCursor child, CXCursor parent, CXClientData client_data) -> CXChildVisitResult {
-          const auto data = static_cast<ClientData *>(client_data);
-          if (clang_getCursorKind(child) == CXCursor_ParmDecl) {
-            const std::string name = utils::getCursorSpelling(child);
-            const std::string kind = utils::getCursorKindSpelling(child);
-            const CXString typeSpelling = clang_getTypeSpelling(clang_getCursorType(child));
-            const std::string type = clang_getCString(typeSpelling);
-
-            clang_disposeString(typeSpelling);
-            // auto type = clang_getCString(clang_getTypeSpelling(clang_getCursorType(child)));
-            // std::cout << name << " " << kind << std::endl;
-            data->parentNode->addArg(name);
-            return CXChildVisit_Continue;
-          }
-          return CXChildVisit_Continue;
-        },
-        &clientData);
-
-    // Write fn body
-    clang_visitChildren(
-        cursor,
-        [](CXCursor child, CXCursor parent, CXClientData client_data) -> CXChildVisitResult {
-          const auto data = static_cast<ClientData *>(client_data);
-          data->visitor->visit(child, data->parentNode);
-          return CXChildVisit_Continue;
-        },
-        &clientData);
-
-    parentNode->addChild(newFunction);
-    return CXChildVisit_Continue;
-  }
-
-  template<typename T>
-  CXChildVisitResult handleVarDecl(const CXCursor &cursor, T &parentNode) {
-    const std::string varName = utils::getCursorSpelling(cursor);
-    const CXType type = clang_getCursorType(cursor);
-    const CXString typeSpelling = clang_getTypeSpelling(type);
-    const char *typeSpellingStr = clang_getCString(typeSpelling);
-
-    struct ClientData {
-      AstVisitor *visitor;
-      T parentNode;
-    };
-    ClientData clientData = {this, parentNode};
-
-    clang_disposeString(typeSpelling);
-    clang_visitChildren(
-        cursor,
-        [](CXCursor child, CXCursor parent, CXClientData client_data) -> CXChildVisitResult {
-          auto clientData = static_cast<ClientData *>(client_data);
-          auto cursorKind = clang_getCursorKind(child);
-          auto visitor = clientData->visitor;
-          auto parentNode = clientData->parentNode;
-          const std::string varName = utils::getCursorSpelling(parent);
-
-          if (cursorKind == CXCursor_IntegerLiteral) {
-            std::string intValue = utils::getIntegerLiteralValue(child, visitor->getTranslationUnit());
-            auto *variable =
-                new VariableNode(varName,
-                                 std::atoi( // NOLINT(*-err34-c) // We dont need error handling, plus this is temporary
-                                     intValue.c_str()));
-            parentNode->addChild(variable);
-            return CXChildVisit_Break;
-          } else if (cursorKind == CXCursor_StringLiteral) {
-            std::cout << "StringLiteral: " << utils::getCursorSpelling(child) << std::endl;
-            std::string stringValue = utils::getCursorSpelling(child);
-            auto *variable = new VariableNode(varName, stringValue);
-            parentNode->addChild(variable);
-          } else if (cursorKind == CXCursor_CallExpr) {
-            std::string calledFunctionName = utils::getCursorSpelling(clang_getCursorReferenced(child));
-            // output->write(calledFunctionName + "(");
-            //
-            // clang_visitChildren(
-            //     child,
-            //     [](CXCursor arg, CXCursor parent, CXClientData client_data) {
-            //       auto output = static_cast<LuauCodeGen *>(client_data);
-            //       if (clang_getCursorKind(arg) == CXCursor_DeclRefExpr) {
-            //         std::string argName = utils::getCursorSpelling(clang_getCursorReferenced(arg));
-            //         output->write(argName + ", ");
-            //       }
-            //       return CXChildVisit_Continue;
-            //     },
-            //     output);
-            //
-            // output->removeTrailingComma();
-            // output->write(")\n");
-            // // visitor->visit(child, parent);
-            return CXChildVisit_Break;
-          } else {
-            std::cout << "Unknown variable-cursor kind: " << utils::getCursorKindSpelling(child) << std::endl;
-          }
-          return CXChildVisit_Recurse;
-        },
-        &clientData);
-
-    return CXChildVisit_Continue;
-  }
-
-  std::string mainSourceFile_;
-  CXTranslationUnit translationUnit_;
-};
-
-int main(const int argc, char *argv[]) {
-  LuauAstGenerator generator;
-  if (argc != 2) {
-    std::cerr << "Incorrect Use! Proper Usage: " << argv[0] << " <source_file.cpp>" << std::endl;
+  if (inputFile.empty()) {
+    std::cerr << "Error: No input file specified.\n";
+    printUsage(argv[0]);
     return 1;
   }
 
-  const std::string mainSourceFile = argv[1];
-  const CXIndex index = clang_createIndex(0, 0);
-  CXTranslationUnit unit =
-      clang_parseTranslationUnit(index, mainSourceFile.c_str(), nullptr, 0, nullptr, 0, CXTranslationUnit_None);
-  if (unit == nullptr) {
-    std::cerr << "Error: Unable to parse translation unit." << std::endl;
-    clang_disposeIndex(index);
+  // Check if input file exists
+  if (!std::filesystem::exists(inputFile)) {
+    std::cerr << "Error: Input file does not exist: " << inputFile << "\n";
     return 1;
   }
 
-  const auto compileStartClock = std::chrono::high_resolution_clock::now();
-  const CXCursor rootCursor = clang_getTranslationUnitCursor(unit);
-  LuauNode rootNode;
-  LuauCodeGen luaOutput;
-  AstVisitor visitor(mainSourceFile);
+  // Create transpiler and process file
+  roblox_transpiler::Transpiler transpiler;
+  transpiler.setVerbose(verbose);
 
-  // Top level things
-  luaOutput.writeln("-- im mentally unstable now --");
-  visitor.setTranslationUnit(unit);
-  visitor.setRootNode(&rootNode);
+  if (verbose) {
+    std::cout << "Transpiling: " << inputFile << "\n";
+  }
 
-  // Traverse the ast
-  clang_visitChildren(
-      rootCursor,
-      [](CXCursor c, CXCursor p, CXClientData d) {
-        const auto astVisitor = static_cast<AstVisitor *>(d);
-        return astVisitor->visit(c, astVisitor->root);
-      },
-      &visitor);
+  bool success = transpiler.transpileFile(inputFile, outputFile);
+  if (!success) {
+    std::cerr << "Transpilation failed: " << transpiler.getLastError() << "\n";
+    return 1;
+  }
+  // Generate bootstrapper if requested
+  if (generateBootstrapper) {
+    std::string bootstrapFile = "tests/output/bootstrap.luau";
 
-  // Render luau ast
-  rootNode.render(luaOutput);
-  luaOutput.writeToFile(OUTPUT_FILENAME);
-  luaOutput.writeToConsole();
+    if (bool bootstrapSuccess = transpiler.generateBootstrapper(inputFile, bootstrapFile)) {
+      if (verbose) {
+        std::cout << "Bootstrapper generated: " << bootstrapFile << "\n";
+      }
+    } else {
+      std::cerr << "Warning: Failed to generate bootstrapper\n";
+    }
+  }
 
-  // Debugging/performance info
-  const auto compileEndClock = std::chrono::high_resolution_clock::now();
-  const auto compileDurationInMS =
-      std::chrono::duration_cast<std::chrono::milliseconds>(compileEndClock - compileStartClock);
-  printf("Time taken: %lld ms.", compileDurationInMS.count());
+  // Also output to console if verbose
+  if (verbose) {
+    std::cout << "\n--- Generated Luau Code ---\n";
+    std::string luauCode = transpiler.transpileToString(inputFile);
+    std::cout << luauCode << "\n";
+    std::cout << "--- End Generated Code ---\n";
+  }
 
-  clang_disposeTranslationUnit(unit);
-  clang_disposeIndex(index);
   return 0;
 }
